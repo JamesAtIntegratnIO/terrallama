@@ -1,0 +1,20 @@
+[package]
+name = "terrallama"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.79"
+base64 = "0.21.7"
+bytes = "1.5.0"
+flate2 = "1.0.28"
+futures = "0.3.30"
+indicatif = "0.17.8"
+octocrab = "0.34.0"
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tar = "0.4.40"
+tokio = { version = "1", features = ["full"] }
+url = "2.5.0"
+

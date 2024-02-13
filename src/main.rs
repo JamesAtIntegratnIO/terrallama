@@ -1,0 +1,123 @@
+use indicatif::{ProgressBar, ProgressStyle};
+use serde::{Deserialize, Serialize};
+use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use std::fs::File;
+use std::io::Write;
+use futures::future::try_join_all;
+use tokio::task;
+use anyhow::{Result, Error};
+
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Link {
+    git: Option<String>,
+    html: Option<String>,
+    #[serde(rename = "self")]
+    self_: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Entry {
+    #[serde(rename = "type")]
+    type_: String,
+    size: i32,
+    name: String,
+    path: String,
+    sha: String,
+    url: String,
+    git_url: Option<String>,
+    html_url: Option<String>,
+    download_url: Option<String>,
+    #[serde(rename = "_links")]
+    links: Link,
+}
+
+#[derive(Debug)]
+pub struct Repo {
+    pub owner: String,
+    pub name: String,
+    pub path: String,
+    pub tag: String,
+}
+
+async fn fetch_content_tree(url: &str, bearer_token: &String, headers: &HeaderMap) -> Result<Vec<Entry>> {
+    let client = reqwest::Client::new();
+    let response = client.get(url)
+        .headers(headers.clone())
+        .bearer_auth(&bearer_token)
+        .send()
+        .await?;
+    let entries = response
+        .json::<Vec<Entry>>()
+        .await?;
+    Ok(entries)
+}
+
+async fn download_markdown_files(entries: Vec<Entry>, file_path: String, bearer_token: &String, headers: &HeaderMap) -> Result<()> {
+    let client = reqwest::Client::new();
+
+    // Create a new progress bar with a length of the total number of entries
+    let progress_bar = ProgressBar::new(entries.len() as u64);
+
+    progress_bar.set_style(ProgressStyle::default_bar()
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>7}/{len:7} {msg}")
+        .expect("Error setting progress bar template")
+        .progress_chars("##-"));
+
+    let tasks: Vec<_> = entries.into_iter().filter(|e| e.name.ends_with(".markdown")).map(|entry| {
+        let client = client.clone();
+        let headers = headers.clone();
+        let bearer_token = bearer_token.clone();
+        let file_path = file_path.clone();
+        let progress_bar = progress_bar.clone();
+
+        task::spawn(async move {
+            if let Some(download_url) = entry.download_url {
+                let content = client.get(&download_url).headers(headers).bearer_auth(&bearer_token).send().await?.text().await?;
+                let full_file_path = format!("{}/{}", file_path, entry.name);
+                let mut file = File::create(full_file_path)?;
+                file.write_all(content.as_bytes())?;
+
+                progress_bar.inc(1);
+                progress_bar.set_message(entry.name);
+            }
+            Ok::<(), Error>(())
+        })
+    }).collect();
+
+    // Wait for all tasks to complete.
+    try_join_all(tasks).await?;
+
+    progress_bar.finish_with_message("Download complete");
+
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() {
+
+    let repo = Repo {
+        owner: String::from("hashicorp"),
+        name: String::from("terraform-provider-aws"),
+        path: String::from("website/docs/d"),
+        tag: String::from("v5.36.0"),
+    };
+    let file_path = String::from("markdown");
+    let mut headers = HeaderMap::new();
+    headers.insert(USER_AGENT, HeaderValue::from_static("Rust"));
+
+
+    let bearer_token = std::env::var("GITHUB_BEARER_TOKEN").expect("GITHUB_BEARER_TOKEN not set");
+
+
+    let url = format!("https://api.github.com/repos/{}/{}/contents/{}", repo.owner, repo.name, repo.path);
+    match fetch_content_tree(&url, &bearer_token, &headers).await {
+        Ok(entries) => {
+            if let Err(e) = download_markdown_files(entries, file_path, &bearer_token, &headers).await {
+                println!("Error downloading markdown files: {}", e);
+            }
+        },
+        Err(e) => println!("Error fetching content tree: {}", e),
+    }
+}
+
