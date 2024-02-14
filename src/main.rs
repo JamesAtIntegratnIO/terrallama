@@ -49,8 +49,18 @@ pub struct Repo {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct RepoConfig {
+pub struct Host {
+    pub host: String,
+    pub port: String,
+    pub path: Option<String>,
+    
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Config {
     repos: Vec<Repo>,
+    qdrant: Host,
+    open_ai: Host,
 }
 
 async fn fetch_content_tree(url: &str, bearer_token: &String, headers: &HeaderMap) -> Result<Vec<Entry>> {
@@ -106,10 +116,10 @@ async fn download_markdown_files(entries: Vec<Entry>, file_path: String, bearer_
     Ok(())
 }
 
-fn read_repo_config(config_path: &str) -> RepoConfig {
+fn read_config(config_path: &str) -> Config {
     let config_content = fs::read_to_string(config_path)
         .expect("Failed to read config file.");
-    let config: RepoConfig = toml::from_str(&config_content)
+    let config: Config = toml::from_str(&config_content)
         .expect("Failed to parse config file");
     println!("Loaded repo configurations");
     config
@@ -119,7 +129,7 @@ fn read_repo_config(config_path: &str) -> RepoConfig {
 async fn main() {
     // Load the config
     let config_path = "config.toml";
-    let repo_config = read_repo_config(config_path);
+    let config = read_config(config_path);
 
     // Set the save path
     let file_path = String::from("markdown");
@@ -131,7 +141,7 @@ async fn main() {
     // Get the bearer_token from env
     let bearer_token = std::env::var("GITHUB_BEARER_TOKEN").expect("GITHUB_BEARER_TOKEN not set");
 
-    for repo in repo_config.repos.iter() {
+    for repo in config.repos.iter() {
     let url = format!("https://api.github.com/repos/{}/{}/contents/{}", repo.owner, repo.name, repo.path);
         match fetch_content_tree(&url, &bearer_token, &headers).await {
             Ok(entries) => {
@@ -142,8 +152,13 @@ async fn main() {
             Err(e) => println!("Error fetching content tree: {}", e),
         }
     }
-
-    std::env::set_var("OPENAI_API_BASE_URL", "http://localhost:11434/v1");
+    // This is just running a basic ollama codellama setup calling the bot
+    std::env::set_var("OPENAI_API_BASE_URL", format!("http://{}:{}/{}", 
+        config.open_ai.host, 
+        config.open_ai.port, 
+        config.open_ai.path
+            .unwrap_or("".to_string())
+    ));
     std::env::set_var("OPENAI_API_KEY", "ollama");
     
     let opts = options!(

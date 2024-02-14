@@ -4,3 +4,12 @@ name = "terraform-provider-aws"
 path = "website/docs/d"
 tag = "v5.36.0"
 
+[qdrant]
+host = "localhost"
+port = "6334"
+
+
+[open_ai]
+host = "localhost"
+port = "11434"
+path = "v1"
