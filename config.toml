@@ -1,0 +1,6 @@
+[[repos]]
+owner = "hashicorp"
+name = "terraform-provider-aws"
+path = "website/docs/d"
+tag = "v5.36.0"
+

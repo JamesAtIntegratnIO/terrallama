@@ -1,11 +1,13 @@
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use std::fs;
 use std::fs::File;
 use std::io::Write;
 use futures::future::try_join_all;
 use tokio::task;
 use anyhow::{Result, Error};
+use toml;
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -32,12 +34,17 @@ struct Entry {
     links: Link,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct Repo {
     pub owner: String,
     pub name: String,
     pub path: String,
     pub tag: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RepoConfig {
+    repos: Vec<Repo>,
 }
 
 async fn fetch_content_tree(url: &str, bearer_token: &String, headers: &HeaderMap) -> Result<Vec<Entry>> {
@@ -93,15 +100,26 @@ async fn download_markdown_files(entries: Vec<Entry>, file_path: String, bearer_
     Ok(())
 }
 
+fn read_repo_config(config_path: &str) -> RepoConfig {
+    let config_content = fs::read_to_string(config_path)
+        .expect("Failed to read config file.");
+    let config: RepoConfig = toml::from_str(&config_content)
+        .expect("Failed to parse config file");
+    println!("Loaded repo configurations");
+    config
+}
+
 #[tokio::main]
 async fn main() {
 
-    let repo = Repo {
-        owner: String::from("hashicorp"),
-        name: String::from("terraform-provider-aws"),
-        path: String::from("website/docs/d"),
-        tag: String::from("v5.36.0"),
-    };
+    //let repo = Repo {
+    //    owner: String::from("hashicorp"),
+    //    name: String::from("terraform-provider-aws"),
+    //    path: String::from("website/docs/d"),
+    //    tag: String::from("v5.36.0"),
+    //};
+    let config_path = "config.toml";
+    let repo_config = read_repo_config(config_path);
     let file_path = String::from("markdown");
     let mut headers = HeaderMap::new();
     headers.insert(USER_AGENT, HeaderValue::from_static("Rust"));
@@ -109,15 +127,16 @@ async fn main() {
 
     let bearer_token = std::env::var("GITHUB_BEARER_TOKEN").expect("GITHUB_BEARER_TOKEN not set");
 
-
+    for repo in repo_config.repos.iter() {
     let url = format!("https://api.github.com/repos/{}/{}/contents/{}", repo.owner, repo.name, repo.path);
-    match fetch_content_tree(&url, &bearer_token, &headers).await {
-        Ok(entries) => {
-            if let Err(e) = download_markdown_files(entries, file_path, &bearer_token, &headers).await {
-                println!("Error downloading markdown files: {}", e);
-            }
-        },
-        Err(e) => println!("Error fetching content tree: {}", e),
+        match fetch_content_tree(&url, &bearer_token, &headers).await {
+            Ok(entries) => {
+                if let Err(e) = download_markdown_files(entries, file_path.clone(), &bearer_token, &headers).await {
+                    println!("Error downloading markdown files: {}", e);
+                }
+            },
+            Err(e) => println!("Error fetching content tree: {}", e),
+        }
     }
 }
 
