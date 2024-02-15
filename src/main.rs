@@ -72,12 +72,12 @@ async fn main() {
 
     std::env::set_var("OPENAI_API_KEY", "ollama");
     let openai_config = OpenAIConfig::new().with_api_base("http://10.0.1.1:11434/v1".to_string());
-    let client = Client::with_config(openai_config);
+    let client = Client::with_config(openai_config.with_api_key("ollama".to_string()));
     println!("{:#?}", client);
     
     
     let qurl = format!("http://{}:{}", config.qdrant.host, config.qdrant.port);
-    let qconfig = QdrantClientConfig::from_url(&qurl);
+    let qconfig = QdrantClientConfig::from_url("http://localhost:6334");
     let qclient = Arc::new(QdrantClient::new(Some(qconfig)).unwrap());
     let collection_name = "aws_test".to_string();
     let embedding_size = 1536;
@@ -103,7 +103,7 @@ async fn main() {
         .unwrap();
     };
 
-    let embeddings = llm_chain_openai::embeddings::Embeddings::for_client(client, "llama2:7b");
+    let embeddings = llm_chain_openai::embeddings::Embeddings::for_client(client, "codellama");
 
     // Storing documents
     let qdrant: Qdrant<llm_chain_openai::embeddings::Embeddings, EmptyMetadata> = Qdrant::new(
@@ -116,7 +116,7 @@ async fn main() {
     );
     let file_path = "./markdown/region.html.markdown";
     let document = create_document_from_file(file_path).expect("Failed to fetch document");
-    let doc_ids = qdrant.add_documents(vec![document]).await.unwrap();
+    let doc_ids = qdrant.add_texts(vec!["all your bases are belong to us".to_string()]).await.unwrap();
 
     println!("Vectors stored under IDs {:?}", doc_ids);
 
