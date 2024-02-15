@@ -20,3 +20,8 @@ toml = "0.8.10"
 url = "2.5.0"
 llm-chain = {path = "/home/boboysdadda/Projects/llm-chain/crates/llm-chain"}
 llm-chain-openai = {path = "/home/boboysdadda/Projects/llm-chain/crates/llm-chain-openai"}
+llm-chain-qdrant = {path = "/home/boboysdadda/Projects/llm-chain/crates/llm-chain-qdrant"}
+qdrant-client = "1.7.0"
+arc = "0.0.1"
+async-openai = "0.16.2"
+sec = "1.0.0"

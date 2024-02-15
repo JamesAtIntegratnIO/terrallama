@@ -1,5 +1,5 @@
-use crate::models::{Entry};
-use reqwest::header::{HeaderMap};
+use crate::models::Entry;
+use reqwest::header::HeaderMap;
 use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::{Result, Error};
 use std::fs::File;
@@ -7,7 +7,7 @@ use std::io::Write;
 use futures::future::try_join_all;
 use tokio::task;
 
-pub async fn Fetch_Content_Tree(url: &str, bearer_token: &String, headers: &HeaderMap) -> Result<Vec<Entry>> {
+pub async fn fetch_content_tree(url: &str, bearer_token: &String, headers: &HeaderMap) -> Result<Vec<Entry>> {
     let client = reqwest::Client::new();
     let response = client.get(url)
         .headers(headers.clone())
@@ -20,7 +20,7 @@ pub async fn Fetch_Content_Tree(url: &str, bearer_token: &String, headers: &Head
     Ok(entries)
 }
 
-pub async fn Download_Markdown_Files(entries: Vec<Entry>, file_path: String, bearer_token: &String, headers: &HeaderMap) -> Result<()> {
+pub async fn download_markdown_files(entries: Vec<Entry>, file_path: String, bearer_token: &String, headers: &HeaderMap) -> Result<()> {
     let client = reqwest::Client::new();
 
     // Create a new progress bar with a length of the total number of entries
